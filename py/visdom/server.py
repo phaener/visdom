@@ -20,6 +20,8 @@ import json
 import logging
 import math
 import os
+import random
+import string
 import time
 import traceback
 from os.path import expanduser
@@ -39,6 +41,8 @@ DEFAULT_ENV_PATH = '%s/.visdom/' % expanduser("~")
 DEFAULT_PORT = 8097
 DEFAULT_HOSTNAME = "localhost"
 DEFAULT_BASE_URL = "/"
+DEFAULT_USERNAME = "visdom"
+DEFAULT_PASSWORD = "visdom"
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -88,10 +92,17 @@ def extract_eid(args):
     return escape_eid(eid)
 
 
-def set_cookie():
+def create_cookie():
     """Create cookie secret key for authentication"""
-    cookie_secret = input("Please input your cookie secret key here: ")
-    with open(DEFAULT_ENV_PATH + "COOKIE_SECRET", "w") as cookie_file:
+    string_length = 25
+    letters_and_digits = string.ascii_letters + string.digits
+    cookie_secret = ''.join(random.choice(letters_and_digits) for i in range(string_length))
+    return cookie_secret
+
+def set_cookie(path):
+    """Create cookie secret key for authentication"""
+    cookie_secret = create_cookie()
+    with open(path + "COOKIE_SECRET", "w") as cookie_file:
         cookie_file.write(cookie_secret)
 
 
@@ -138,7 +149,7 @@ class Application(tornado.web.Application):
         if user_credential:
             self.login_enabled = True
             tornado_settings["cookie_secret"] = \
-                open(DEFAULT_ENV_PATH + "COOKIE_SECRET", "r").read()
+                open(env_path + "COOKIE_SECRET", "r").read()
 
         # reload state
         ensure_dir_exists(env_path)
@@ -1231,27 +1242,33 @@ def start_server(port=DEFAULT_PORT, hostname=DEFAULT_HOSTNAME,
 
 def main(print_func=None):
     parser = argparse.ArgumentParser(description='Start the visdom server.')
-    parser.add_argument('-port', metavar='port', type=int,
+    parser.add_argument('--port', metavar='port', type=int,
                         default=DEFAULT_PORT,
                         help='port to run the server on.')
     parser.add_argument('--hostname', metavar='hostname', type=str,
                         default=DEFAULT_HOSTNAME,
                         help='host to run the server on.')
-    parser.add_argument('-base_url', metavar='base_url', type=str,
+    parser.add_argument('--base_url', metavar='base_url', type=str,
                         default=DEFAULT_BASE_URL,
                         help='base url for server (default = /).')
-    parser.add_argument('-env_path', metavar='env_path', type=str,
+    parser.add_argument('--env_path', metavar='env_path', type=str,
                         default=DEFAULT_ENV_PATH,
                         help='path to serialized session to reload.')
-    parser.add_argument('-logging_level', metavar='logger_level',
+    parser.add_argument('--username', metavar='username', type=str,
+                        default=DEFAULT_USERNAME,
+                        help='username for login.')
+    parser.add_argument('--password', metavar='password', type=str,
+                        default=DEFAULT_PASSWORD,
+                        help='password for login.')
+    parser.add_argument('--logging_level', metavar='logger_level',
                         default='INFO',
                         help='logging level (default = INFO). Can take '
                              'logging level name or int (example: 20)')
-    parser.add_argument('-readonly', help='start in readonly mode',
+    parser.add_argument('--readonly', help='start in readonly mode',
                         action='store_true')
-    parser.add_argument('-enable_login', default=False, action='store_true',
+    parser.add_argument('--enable_login', default=False, action='store_true',
                         help='start the server with authentication')
-    parser.add_argument('-force_new_cookie', default=False,
+    parser.add_argument('--force_new_cookie', default=False,
                         action='store_true',
                         help='start the server with the new cookie, '
                              'available when -enable_login provided')
@@ -1277,18 +1294,15 @@ def main(print_func=None):
     logging.getLogger().setLevel(logging_level)
 
     if FLAGS.enable_login:
-        username = input("Please input your username: ")
-        password = getpass.getpass(prompt="Please input your password: ")
-
         user_credential = {
-            "username": username,
-            "password": hash_password(hash_password(password))
+            "username": FLAGS.username,
+            "password": hash_password(hash_password(FLAGS.password))
         }
 
-        if not os.path.isfile(DEFAULT_ENV_PATH + "COOKIE_SECRET"):
-            set_cookie()
+        if not os.path.isfile(FLAGS.env_path + "COOKIE_SECRET"):
+            set_cookie(FLAGS.env_path)
         elif FLAGS.force_new_cookie:
-            set_cookie()
+            set_cookie(FLAGS.env_path)
     else:
         user_credential = None
 
