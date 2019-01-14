@@ -1273,7 +1273,7 @@ def main(print_func=None):
     parser.add_argument('--force_new_cookie', default=False,
                         action='store_true',
                         help='start the server with the new cookie, '
-                             'available when -enable_login provided')
+                             'available when --enable_login provided')
     FLAGS = parser.parse_args()
 
     # Process base_url
